@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VR Raumschrottmann</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <canvas id="game-canvas"></canvas>
+
+    <section class="hud">
+      <div class="panel">
+        <h1>Neo Junk Ops</h1>
+        <p>Collect the floating debris with your laser and toss it into the core.</p>
+        <ul>
+          <li>Click to lock cursor and aim.</li>
+          <li>WASD to move, Shift to sprint.</li>
+          <li>Hold left mouse to pull debris. Release to throw.</li>
+          <li>Press <strong>T</strong> or use Teleport button.</li>
+        </ul>
+        <button id="teleport-btn">Teleport</button>
+      </div>
+      <div class="status">
+        <span>Collected:</span>
+        <span id="collected-count">0</span>
+      </div>
+    </section>
+
+    <div class="reticle"></div>
+
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
+
