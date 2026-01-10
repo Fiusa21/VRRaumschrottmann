@@ -1,5 +1,4 @@
 import { SceneManager } from './core/SceneManager.js';
-import { XRButton } from 'three/addons/webxr/XRButton.js';
 
 const canvas = document.getElementById('game-canvas');
 const teleportBtn = document.getElementById('teleport-btn');
@@ -15,17 +14,32 @@ const sceneManager = new SceneManager(canvas, {
 sceneManager.init().then(() => {
   sceneManager.start();
   
-  // Setup WebXR button
-  const xrBtn = XRButton.createButton(sceneManager.renderer, {
-    requiredFeatures: ['local-floor'],
-    optionalFeatures: ['bounded-floor', 'hand-tracking']
+  // Setup custom VR button - explicitly request immersive-vr
+  xrButton.addEventListener('click', async () => {
+    try {
+      const session = await navigator.xr.requestSession('immersive-vr', {
+        requiredFeatures: ['local-floor'],
+        optionalFeatures: ['bounded-floor', 'hand-tracking', 'dom-overlay'],
+        domOverlay: { root: document.body }
+      });
+      
+      await sceneManager.renderer.xr.setSession(session);
+      xrButton.textContent = 'Exit VR';
+      xrButton.disabled = true;
+    } catch (err) {
+      console.error('WebXR session request failed:', err);
+      alert('VR not supported on this device');
+    }
   });
   
-  // Replace the placeholder button with the XRButton
-  xrButton.replaceWith(xrBtn);
+  // Handle VR exit
+  sceneManager.renderer.xr.addEventListener('sessionend', () => {
+    xrButton.textContent = 'Enter VR';
+    xrButton.disabled = false;
+  });
   
   // Style the XR button to match the UI
-  xrBtn.classList.add('xr-button');
+  xrButton.classList.add('xr-button');
   const style = document.createElement('style');
   style.textContent = `
     .xr-button {

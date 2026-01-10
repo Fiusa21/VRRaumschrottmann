@@ -104,6 +104,12 @@ export class SceneManager {
     this.player = new Player(this.camera, this.canvas);
     this.scene.add(this.player.root);
 
+    // Create a VR camera rig that is separate from the player root
+    this.cameraRig = new THREE.Group();
+    this.cameraRig.add(this.camera);
+    this.cameraRig.position.set(0, 2, 10); // Initial VR position
+    this.scene.add(this.cameraRig);
+
     this.garbageField = new GarbageField(this.scene, this.collectorPit.radius);
 
     this.laserTool = new LaserTool({
@@ -121,7 +127,7 @@ export class SceneManager {
       this.renderer,
       this.scene,
       this.camera,
-      this.player,
+      this.cameraRig,
       this.laserTool
     );
   }
