@@ -5,6 +5,7 @@ import { GarbageField } from './GarbageField.js';
 import { LaserTool } from './LaserTool.js';
 import { CollectorPit } from './CollectorPit.js';
 import { TeleportController } from './TeleportController.js';
+import { VRController } from './VRController.js';
 
 export class SceneManager {
   constructor(canvas, hooks = {}) {
@@ -15,6 +16,9 @@ export class SceneManager {
     this.renderer.shadowMap.enabled = true;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    // Enable WebXR
+    this.renderer.xr.enabled = true;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#03050c');
@@ -45,7 +49,14 @@ export class SceneManager {
   update() {
     const delta = Math.min(this.clock.getDelta(), 0.05);
 
-    this.player.update(delta);
+    // Update VR controllers if in VR mode
+    if (this.vrController && this.renderer.xr.isPresenting) {
+      this.vrController.update(delta);
+    } else {
+      // Only update player with keyboard controls if not in VR
+      this.player.update(delta);
+    }
+
     this.collectorPit.animate(delta);
     this.garbageField.update(delta);
     this.laserTool.update(delta);
@@ -76,6 +87,13 @@ export class SceneManager {
     this.scene.add(dirLight);
 
     this.platform = new Platform();
+    this.platform.mesh.userData.teleportable = true;
+    // Mark all child meshes as teleportable
+    this.platform.mesh.traverse((child) => {
+      if (child.isMesh) {
+        child.userData.teleportable = true;
+      }
+    });
     this.scene.add(this.platform.mesh);
 
     this.collectorPit = new CollectorPit();
@@ -97,6 +115,15 @@ export class SceneManager {
     this.teleportController = new TeleportController({
       radius: this.platform.radius * 0.7,
     });
+
+    // Setup VR controllers after all actors are created
+    this.vrController = new VRController(
+      this.renderer,
+      this.scene,
+      this.camera,
+      this.player,
+      this.laserTool
+    );
   }
 
   #setupEvents() {
@@ -104,6 +131,16 @@ export class SceneManager {
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Handle WebXR session events
+    this.renderer.xr.addEventListener('sessionstart', () => {
+      // Update camera for VR
+      this.camera.position.set(0, 2, 10);
+    });
+
+    this.renderer.xr.addEventListener('sessionend', () => {
+      // Return to desktop mode
     });
   }
 
