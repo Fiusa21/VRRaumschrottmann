@@ -3,7 +3,7 @@ import { Player } from './Player.js';
 import { Platform } from './Platform.js';
 import { GarbageField } from './GarbageField.js';
 import { LaserTool } from './LaserTool.js';
-import { CollectorPit } from './CollectorPit.js';
+import { GarbageCollector } from './GarbageCollector.js';
 import { TeleportController } from './TeleportController.js';
 
 export class SceneManager {
@@ -62,18 +62,19 @@ export class SceneManager {
     if (movementDelta.lengthSq() > 0) {
       movementDelta.multiplyScalar(-1);
       this.platform.mesh.position.add(movementDelta);
-      this.collectorPit.group.position.add(movementDelta);
+      this.garbageCollectors.forEach(collector => collector.group.position.add(movementDelta));
       this.garbageField.moveAll(movementDelta);
       this.teleportController.moveAllPoints(movementDelta);
     }
     
-    this.collectorPit.animate(delta);
+    // Animate garbage collectors
+    this.garbageCollectors.forEach(collector => collector.animate(delta));
+    
     this.laserTool.update(delta);  // Run BEFORE garbageField so objects get grabbed before physics
     this.garbageField.update(delta);
-    this.collectorPit.checkCapture(
-        this.garbageField.meshes,
-        this.#handleCollection.bind(this)
-    );
+    
+    // Check collision with garbage collectors
+    this.#checkCollectorCollisions();
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -101,7 +102,7 @@ export class SceneManager {
       // This is more reliable than moving the player in VR
       const yOffset = -4.5;
       this.platform.mesh.position.y += yOffset;
-      this.collectorPit.group.position.y += yOffset;
+      this.garbageCollectors.forEach(collector => collector.group.position.y += yOffset);
       this.garbageField.moveAll(new THREE.Vector3(0, yOffset, 0));
       this.teleportController.moveAllPoints(new THREE.Vector3(0, yOffset, 0));
       
@@ -156,15 +157,30 @@ export class SceneManager {
     this.platform = new Platform();
     this.scene.add(this.platform.mesh);
 
-    this.collectorPit = new CollectorPit();
-    this.scene.add(this.collectorPit.group);
+    // Create garbage collectors in space around the platform
+    this.garbageCollectors = [];
+    const positions = [
+      new THREE.Vector3(15, 8, 0),
+      new THREE.Vector3(-15, 8, 0),
+      new THREE.Vector3(0, 8, 15),
+      new THREE.Vector3(0, 8, -15),
+      new THREE.Vector3(12, 10, 12),
+      new THREE.Vector3(-12, 10, 12),
+      new THREE.Vector3(12, 10, -12),
+      new THREE.Vector3(-12, 10, -12),
+    ];
+    for (const pos of positions) {
+      const collector = new GarbageCollector(pos);
+      this.garbageCollectors.push(collector);
+      this.scene.add(collector.group);
+    }
   }
 
   #setupActors() {
     this.player = new Player(this.camera, this.canvas);
     this.scene.add(this.player.root);
 
-    this.garbageField = new GarbageField(this.scene, this.collectorPit.radius);
+    this.garbageField = new GarbageField(this.scene);
 
     this.laserTool = new LaserTool({
       player: this.player,
@@ -183,6 +199,23 @@ export class SceneManager {
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
     });
+  }
+
+  #checkCollectorCollisions() {
+    for (const mesh of this.garbageField.meshes) {
+      // Only check thrown and floating objects
+      if (mesh.userData.state !== 'thrown' && mesh.userData.state !== 'floating') {
+        continue;
+      }
+      
+      // Check collision with each garbage collector
+      for (const collector of this.garbageCollectors) {
+        if (collector.checkCollision(mesh)) {
+          this.#handleCollection(mesh);
+          break; // Object collected, move to next mesh
+        }
+      }
+    }
   }
 
   #handleCollection(mesh) {
@@ -213,8 +246,8 @@ export class SceneManager {
           // Apply deadzone
           const deadzone = 0.2;
           if (Math.abs(lx) > deadzone || Math.abs(ly) > deadzone) {
-            this.player.move.forward = ly < -deadzone;
-            this.player.move.backward = ly > deadzone;
+            this.player.move.forward = ly > deadzone;
+            this.player.move.backward = ly < -deadzone;
             this.player.move.left = lx < -deadzone;
             this.player.move.right = lx > deadzone;
           } else {

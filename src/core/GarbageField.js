@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 
 export class GarbageField {
-  constructor(scene, innerRadius) {
+  constructor(scene) {
     this.scene = scene;
-    this.innerRadius = innerRadius;
+    this.innerRadius = 2.6;
     this.meshes = [];
     this.count = 18;
     this.tempVec = new THREE.Vector3();
@@ -45,8 +45,16 @@ export class GarbageField {
           data.velocity.y += (targetY - mesh.position.y) * delta * 5;
           data.velocity.multiplyScalar(0.9); // Friction to keep it stable
         } else if (data.state === 'thrown') {
-          // Thrown objects: apply minimal drag to let them travel far
+          // Thrown objects: apply gravity only when approaching the pit, minimal drag to travel
           data.velocity.multiplyScalar(0.99); // Very low drag to preserve momentum
+          
+          // Check if getting close to pit center - start falling when near pit
+          const distToPitCenter = Math.sqrt(mesh.position.x ** 2 + mesh.position.z ** 2);
+          if (distToPitCenter < 4) {
+            // Close to pit - apply gravity to pull down
+            data.velocity.y -= delta * 20;
+          }
+          
           // Once velocity is low, transition back to floating
           if (data.velocity.length() < 0.1) {  // Higher threshold - let them travel longer
             console.log('Thrown object settling, changing to floating - uuid:', mesh.uuid, 'thrownTime:', data.thrownTime);
