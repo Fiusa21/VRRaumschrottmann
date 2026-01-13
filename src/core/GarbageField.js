@@ -104,6 +104,12 @@ export class GarbageField {
     mesh.material.dispose();
   }
 
+  moveAll(delta) {
+    for (const mesh of this.meshes) {
+      mesh.position.add(delta);
+    }
+  }
+
   #populate() {
     for (let i = 0; i < this.count; i += 1) {
       const mesh = this.#createDebris();

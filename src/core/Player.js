@@ -8,7 +8,7 @@ export class Player {
 
     this.controls = new PointerLockControls(camera, canvas);
     this.root = this.controls.getObject();
-    this.root.position.set(0, 2, 10);
+    this.root.position.set(0, 8, 10);
 
     this.velocity = new THREE.Vector3();
     this.direction = new THREE.Vector3();
@@ -40,17 +40,18 @@ export class Player {
       Number(this.move.forward) - Number(this.move.backward)
     );
 
+    const movementDelta = new THREE.Vector3();
+
     if (this.direction.lengthSq() > 0) {
       this.direction.normalize();
-      const moveX = this.direction.x * speed * delta;
-      const moveZ = this.direction.z * speed * delta;
-      this.controls.moveRight(moveX);
-      this.controls.moveForward(moveZ);
+      movementDelta.copy(this.direction).multiplyScalar(speed * delta);
     }
 
     if (this.heldMesh) {
       this.#updateHeldMesh(delta);
     }
+
+    return movementDelta;
   }
 
   getHandWorldPosition(target = new THREE.Vector3()) {

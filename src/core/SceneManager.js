@@ -11,10 +11,12 @@ export class SceneManager {
     this.canvas = canvas;
     this.hooks = hooks;
 
-    this.renderer = new THREE.WebGLRenderer({canvas, antialias: true});
+    this.renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
     this.renderer.shadowMap.enabled = true;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.xr.enabled = true;
+    this.renderer.xr.setReferenceSpaceType('local');
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#03050c');
@@ -28,6 +30,10 @@ export class SceneManager {
 
     this.clock = new THREE.Clock();
     this.collected = 0;
+    this.xrSession = null;
+    this.xrInputSources = [];
+    this.lastTriggerState = false;
+    this.xrController = null;
 
     this.update = this.update.bind(this);
   }
@@ -45,7 +51,22 @@ export class SceneManager {
   update() {
     const delta = Math.min(this.clock.getDelta(), 0.05);
 
-    this.player.update(delta);
+    // Process XR controller input if in VR
+    if (this.xrSession && this.xrInputSources.length > 0) {
+      this.#processXRInput();
+    }
+
+    const movementDelta = this.player.update(delta);
+    
+    // Move the world in opposite direction to simulate player movement
+    if (movementDelta.lengthSq() > 0) {
+      movementDelta.multiplyScalar(-1);
+      this.platform.mesh.position.add(movementDelta);
+      this.collectorPit.group.position.add(movementDelta);
+      this.garbageField.moveAll(movementDelta);
+      this.teleportController.moveAllPoints(movementDelta);
+    }
+    
     this.collectorPit.animate(delta);
     this.garbageField.update(delta);
     this.laserTool.update(delta);
@@ -60,6 +81,55 @@ export class SceneManager {
   teleportPlayer() {
     const target = this.teleportController.getNextPoint();
     this.player.teleportTo(target);
+  }
+
+  async startXRSession() {
+    if (!navigator.xr) {
+      alert('WebXR is not supported on this device');
+      return;
+    }
+
+    try {
+      const session = await navigator.xr.requestSession('immersive-vr', {
+        requiredFeatures: ['local-floor'],
+        optionalFeatures: ['dom-overlay'],
+        domOverlay: { root: document.body }
+      });
+      this.xrSession = session;
+      
+      // Create visible controllers
+      const controllerGeometry = new THREE.BoxGeometry(0.05, 0.12, 0.06);
+      const controllerMaterial = new THREE.MeshStandardMaterial({
+        color: '#2fd7ff',
+        emissive: '#2fd7ff',
+        emissiveIntensity: 0.3,
+      });
+      
+      // Right controller (index 1) for aiming
+      this.xrController = this.renderer.xr.getController(1);
+      const rightControllerMesh = new THREE.Mesh(controllerGeometry, controllerMaterial.clone());
+      this.xrController.add(rightControllerMesh);
+      this.scene.add(this.xrController);
+      
+      // Left controller (index 0) for reference
+      const leftController = this.renderer.xr.getController(0);
+      const leftControllerMesh = new THREE.Mesh(controllerGeometry, controllerMaterial.clone());
+      leftController.add(leftControllerMesh);
+      this.scene.add(leftController);
+      
+      // Update laser tool to use controller aiming
+      this.laserTool.setXRController(this.xrController);
+      
+      // Track input sources
+      session.addEventListener('inputsourceschange', (event) => {
+        this.xrInputSources = Array.from(session.inputSources);
+      });
+      
+      this.renderer.xr.setSession(session);
+    } catch (error) {
+      console.error('Failed to start XR session:', error);
+      alert('Could not start VR mode');
+    }
   }
 
   #setupEnvironment() {
@@ -117,6 +187,45 @@ export class SceneManager {
 
     if (typeof this.hooks.onCollect === 'function') {
       this.hooks.onCollect(this.collected);
+    }
+  }
+
+  #processXRInput() {
+    for (const source of this.xrInputSources) {
+      if (source.gamepad) {
+        const gamepad = source.gamepad;
+        
+        // Left thumbstick for movement (axes 2 and 3)
+        // Right thumbstick for rotation (axes 0 and 1)
+        if (gamepad.axes.length >= 4) {
+          const lx = gamepad.axes[2]; // Left thumbstick X
+          const ly = gamepad.axes[3]; // Left thumbstick Y
+          
+          // Set movement states based on thumbstick input
+          // Apply deadzone
+          const deadzone = 0.2;
+          if (Math.abs(lx) > deadzone || Math.abs(ly) > deadzone) {
+            this.player.move.forward = ly < -deadzone;
+            this.player.move.backward = ly > deadzone;
+            this.player.move.left = lx < -deadzone;
+            this.player.move.right = lx > deadzone;
+          } else {
+            this.player.move.forward = false;
+            this.player.move.backward = false;
+            this.player.move.left = false;
+            this.player.move.right = false;
+          }
+        }
+
+        // Trigger button for laser (button 0)
+        const triggerPressed = gamepad.buttons[0]?.pressed || false;
+        if (triggerPressed && !this.lastTriggerState) {
+          this.laserTool.activate();
+        } else if (!triggerPressed && this.lastTriggerState) {
+          this.laserTool.deactivate();
+        }
+        this.lastTriggerState = triggerPressed;
+      }
     }
   }
 }

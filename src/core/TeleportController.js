@@ -12,6 +12,12 @@ export class TeleportController {
     return this.points[this.index].clone();
   }
 
+  moveAllPoints(delta) {
+    for (const point of this.points) {
+      point.add(delta);
+    }
+  }
+
   #makePoints() {
     const points = [];
     const steps = 6;
