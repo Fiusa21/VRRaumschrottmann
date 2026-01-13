@@ -64,9 +64,13 @@ export class LaserTool {
     const hits = this.raycaster.intersectObjects(this.garbageField.meshes);
 
     if (!this.currentTarget && hits.length) {
-      this.currentTarget = hits[0].object;
-      this.currentTarget.userData.velocity.set(0, 0, 0);
-      this.currentTarget.userData.state = 'pulled';
+      const target = hits[0].object;
+      // Don't target objects that are already held
+      if (target.userData.state !== 'held') {
+        this.currentTarget = target;
+        this.currentTarget.userData.velocity.set(0, 0, 0);
+        this.currentTarget.userData.state = 'pulled';
+      }
     }
 
     if (this.currentTarget && this.currentTarget.userData?.state === 'respawning') {
@@ -76,7 +80,10 @@ export class LaserTool {
     let aimPoint = null;
 
     if (this.currentTarget) {
-      this.#pullTowardsHand(delta);
+      // Only pull if object is in 'pulled' state, not if it's already held
+      if (this.currentTarget.userData.state === 'pulled') {
+        this.#pullTowardsHand(delta);
+      }
       if (this.currentTarget) {
         aimPoint = this.currentTarget.position.clone();
       }
@@ -156,24 +163,48 @@ export class LaserTool {
   }
 
   #pullTowardsHand(delta) {
-    // In VR, pull towards controller; on desktop, pull towards hand anchor
-    let handPos = this.tempVec;
+    // In VR, pull towards offset position in front of controller
+    // On desktop, pull towards hand anchor
+    let handPos;
     if (this.xrController) {
+      // Get controller position
+      handPos = new THREE.Vector3();
       this.xrController.getWorldPosition(handPos);
+      
+      // Calculate offset position (same as #updateHeldMesh uses)
+      const controllerDir = new THREE.Vector3(0, 0, -1);
+      controllerDir.applyMatrix4(this.xrController.matrixWorld);
+      
+      const controllerPos = new THREE.Vector3();
+      this.xrController.getWorldPosition(controllerPos);
+      controllerDir.sub(controllerPos).normalize();
+      
+      // Position in front of controller
+      handPos.copy(controllerPos).addScaledVector(controllerDir, 0.3);
+      handPos.y -= 0.15;
     } else {
-      this.player.getHandWorldPosition(handPos);
+      handPos = this.player.getHandWorldPosition(new THREE.Vector3());
     }
     
+    // Directly move the object towards handPos (not using velocity since pulled objects skip GarbageField)
     const target = this.currentTarget.position;
     const direction = handPos.clone().sub(target);
     const distance = direction.length();
+    
     if (distance < 0.4) {
+      // Grab the object
+      console.log('GRABBING object, current state:', this.currentTarget.userData.state, 'object ID:', this.currentTarget.uuid, 'heldMesh before:', this.player.heldMesh?.uuid);
       this.player.attachCargo(this.currentTarget, this.xrController);
+      console.log('After attachCargo, object state should be: held player.heldMesh ID:', this.player.heldMesh.uuid, 'SAME OBJECT?', this.currentTarget === this.player.heldMesh);
       this.currentTarget = null;
+      console.log('Set currentTarget to null');
       return;
     }
+    
+    // Move object directly towards hand position
     direction.normalize();
-    target.addScaledVector(direction, delta * 6 * Math.max(distance, 1));
+    const moveSpeed = 15; // units per second
+    target.addScaledVector(direction, moveSpeed * delta);
   }
 
   #updateBeam(targetPoint) {
@@ -218,10 +249,26 @@ export class LaserTool {
 
   deactivate() {
     this.active = false;
-    if (this.player.heldMesh) {
-      const dir = this.player.camera.getWorldDirection(this.tempDir);
-      this.player.throwCargo(dir, 18);
-    }
+    // No longer throwing on deactivate - let the player control that with grip button
     this.#releaseTarget();
+  }
+
+  throwHeldObject() {
+    if (this.player.heldMesh) {
+      const mesh = this.player.heldMesh; // Save reference before throwCargo sets it to null
+      let dir;
+      if (this.xrController) {
+        // In VR, throw in controller direction (just the rotation, not position)
+        dir = new THREE.Vector3(0, 0, -1);
+        dir.applyQuaternion(this.xrController.quaternion);
+      } else {
+        // On desktop, throw in camera direction
+        dir = this.player.camera.getWorldDirection(this.tempDir);
+      }
+      // Throw with increased strength
+      this.player.throwCargo(dir, 50);
+      // Mark when it was thrown so it can't be collected immediately
+      mesh.userData.thrownTime = performance.now();
+    }
   }
 }

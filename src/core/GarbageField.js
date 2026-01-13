@@ -18,16 +18,23 @@ export class GarbageField {
 
     for (const mesh of this.meshes) {
       const data = mesh.userData;
-      if (data.state === 'respawning') continue;
+      // Skip ONLY respawning, pulled, and held objects - thrown objects need to be processed
+      if (data.state === 'respawning' || data.state === 'pulled' || data.state === 'held') {
+        continue;
+      }
 
       const distFromCenter = Math.sqrt(mesh.position.x ** 2 + mesh.position.z ** 2);
 
       // 1. STATE & GRAVITY LOGIC
       if (distFromCenter < this.innerRadius) {
-        // OVER THE PIT: Apply Gravity and Vortex
-        data.state = 'falling';
+        // OVER THE PIT: Apply Gravity and Vortex (but not if recently thrown)
+        if (data.state !== 'thrown') {
+          data.state = 'falling';
+          if (data.state !== 'falling') {
+            console.log('Setting to falling - uuid:', mesh.uuid, 'state was:', data.state, 'distance:', distFromCenter, 'innerRadius:', this.innerRadius);
+          }
+        }
         data.velocity.y -= delta * 30; // Gravity
-
         this.tempVec.set(-mesh.position.x, 0, -mesh.position.z).normalize();
         data.velocity.addScaledVector(this.tempVec, 15 * delta); // Vortex
       } else {
@@ -37,6 +44,15 @@ export class GarbageField {
           const targetY = data.baseHeight + Math.sin(time + data.floatOffset) * data.floatAmp;
           data.velocity.y += (targetY - mesh.position.y) * delta * 5;
           data.velocity.multiplyScalar(0.9); // Friction to keep it stable
+        } else if (data.state === 'thrown') {
+          // Thrown objects: apply minimal drag to let them travel far
+          data.velocity.multiplyScalar(0.99); // Very low drag to preserve momentum
+          // Once velocity is low, transition back to floating
+          if (data.velocity.length() < 0.1) {  // Higher threshold - let them travel longer
+            console.log('Thrown object settling, changing to floating - uuid:', mesh.uuid, 'thrownTime:', data.thrownTime);
+            data.state = 'floating';
+            data.baseHeight = mesh.position.y;
+          }
         } else if (data.state === 'falling') {
           // If it was "thrown" but isn't over the pit yet,
           // let it travel in a straight line or return to floating
@@ -80,6 +96,7 @@ export class GarbageField {
 
   //either respawn or remove it
   respawn(mesh) {
+    console.log('RESPAWNING mesh - position was:', mesh.position.y, 'state was:', mesh.userData.state);
     mesh.userData.state = 'respawning';
     setTimeout(() => {
       const position = this.#randomPosition();

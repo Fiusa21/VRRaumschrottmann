@@ -16,10 +16,20 @@ export class CollectorPit {
   }
 
   checkCapture(meshes, onCollect) {
+    const now = performance.now();
+    const throwCooldown = 500; // 500ms before thrown objects can be collected
     for (const mesh of meshes) {
-      if (!mesh.visible || mesh.userData.state === 'respawning') continue;
+      // Skip objects being pulled, held, or just thrown - only collect floating or settled thrown objects
+      if (!mesh.visible || mesh.userData.state === 'respawning' || mesh.userData.state === 'pulled' || mesh.userData.state === 'held' || mesh.userData.state === 'thrown') continue;
+      
+      // Don't collect floating objects that were just thrown (within cooldown period)
+      if (mesh.userData.state === 'floating' && mesh.userData.thrownTime && (now - mesh.userData.thrownTime) < throwCooldown) {
+        continue;
+      }
+      
       const distance = Math.hypot(mesh.position.x, mesh.position.z);
       if (distance < this.radius && mesh.position.y < 1.2) {
+        console.log('COLLECTING mesh at distance:', distance, 'y:', mesh.position.y, 'state:', mesh.userData.state);
         onCollect(mesh);
       }
     }

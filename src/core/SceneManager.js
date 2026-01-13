@@ -68,8 +68,8 @@ export class SceneManager {
     }
     
     this.collectorPit.animate(delta);
+    this.laserTool.update(delta);  // Run BEFORE garbageField so objects get grabbed before physics
     this.garbageField.update(delta);
-    this.laserTool.update(delta);
     this.collectorPit.checkCapture(
         this.garbageField.meshes,
         this.#handleCollection.bind(this)
@@ -99,7 +99,7 @@ export class SceneManager {
       
       // Move the world down so player spawns above the platform
       // This is more reliable than moving the player in VR
-      const yOffset = -2.5;
+      const yOffset = -4.5;
       this.platform.mesh.position.y += yOffset;
       this.collectorPit.group.position.y += yOffset;
       this.garbageField.moveAll(new THREE.Vector3(0, yOffset, 0));
@@ -225,7 +225,7 @@ export class SceneManager {
           }
         }
 
-        // Trigger button for laser (button 0)
+        // Trigger button for pulling (button 0)
         const triggerPressed = gamepad.buttons[0]?.pressed || false;
         if (triggerPressed && !this.lastTriggerState) {
           this.laserTool.activate();
@@ -233,6 +233,13 @@ export class SceneManager {
           this.laserTool.deactivate();
         }
         this.lastTriggerState = triggerPressed;
+
+        // Grip button for throwing (button 1)
+        const gripPressed = gamepad.buttons[1]?.pressed || false;
+        if (gripPressed && !this.lastGripState) {
+          this.laserTool.throwHeldObject();
+        }
+        this.lastGripState = gripPressed;
       }
     }
   }

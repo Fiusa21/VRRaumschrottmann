@@ -48,6 +48,11 @@ export class Player {
     }
 
     if (this.heldMesh) {
+      if (!this.heldMesh.userData) {
+        console.log('ERROR: heldMesh has no userData!');
+      } else {
+        console.log('Updating held mesh, state:', this.heldMesh.userData.state, 'visible:', this.heldMesh.visible, 'pos:', this.heldMesh.position);
+      }
       this.#updateHeldMesh(delta);
     }
 
@@ -59,9 +64,16 @@ export class Player {
   }
 
   attachCargo(mesh, xrController = null) {
+    console.log('attachCargo CALLED for mesh:', mesh.uuid, 'current heldMesh:', this.heldMesh?.uuid);
+    if (this.heldMesh && this.heldMesh !== mesh) {
+      console.log('WARNING: Already holding a different object!', this.heldMesh.uuid);
+      return;
+    }
+    console.log('Attaching cargo, state BEFORE:', mesh.userData.state, 'controller:', !!xrController);
     this.heldMesh = mesh;
     mesh.userData.velocity = mesh.userData.velocity || new THREE.Vector3();
     mesh.userData.state = 'held';
+    console.log('Attaching cargo, state AFTER:', mesh.userData.state, 'heldMesh set:', !!this.heldMesh);
     mesh.userData.xrController = xrController;
   }
 
@@ -82,14 +94,29 @@ export class Player {
   #updateHeldMesh(delta) {
     let target;
     if (this.heldMesh.userData.xrController) {
-      // In VR, position relative to controller
+      // In VR, position object in front of the controller
       target = new THREE.Vector3();
       this.heldMesh.userData.xrController.getWorldPosition(target);
+      
+      // Get controller's forward direction and add offset
+      const controllerDir = new THREE.Vector3(0, 0, -1);
+      controllerDir.applyMatrix4(this.heldMesh.userData.xrController.matrixWorld);
+      
+      const controllerPos = new THREE.Vector3();
+      this.heldMesh.userData.xrController.getWorldPosition(controllerPos);
+      controllerDir.sub(controllerPos).normalize();
+      
+      // Position in front of controller: 0.3 units forward
+      target = controllerPos.clone().addScaledVector(controllerDir, 0.3);
+      target.y -= 0.15; // Slight downward offset
     } else {
       // On desktop, position relative to hand anchor
       target = this.getHandWorldPosition();
     }
-    this.heldMesh.position.lerp(target, delta * 18);
+    
+    const oldPos = this.heldMesh.position.clone();
+    // Increase lerp speed from 18 to 30 to track controller more tightly
+    this.heldMesh.position.lerp(target, delta * 30);
     this.heldMesh.quaternion.slerp(this.camera.quaternion, delta * 10);
     this.heldMesh.userData.velocity.set(0, 0, 0);
   }

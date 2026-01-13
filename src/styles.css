@@ -109,3 +109,24 @@ body {
   box-shadow: 0 0 12px rgba(104, 241, 255, 0.5);
 }
 
+.status {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  padding: 1rem 1.25rem;
+  background: var(--panel);
+  border: 1px solid rgba(104, 241, 255, 0.25);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  font-size: 1.5rem;
+  pointer-events: all;
+  z-index: 1000;
+}
+
+.status span:last-child {
+  color: var(--accent);
+  font-weight: bold;
+  font-size: 2rem;
+  margin-left: 0.5rem;
+}
+
