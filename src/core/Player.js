@@ -58,10 +58,11 @@ export class Player {
     return target.setFromMatrixPosition(this.handAnchor.matrixWorld);
   }
 
-  attachCargo(mesh) {
+  attachCargo(mesh, xrController = null) {
     this.heldMesh = mesh;
     mesh.userData.velocity = mesh.userData.velocity || new THREE.Vector3();
     mesh.userData.state = 'held';
+    mesh.userData.xrController = xrController;
   }
 
   throwCargo(direction, strength = 16) {
@@ -79,7 +80,15 @@ export class Player {
   }
 
   #updateHeldMesh(delta) {
-    const target = this.getHandWorldPosition();
+    let target;
+    if (this.heldMesh.userData.xrController) {
+      // In VR, position relative to controller
+      target = new THREE.Vector3();
+      this.heldMesh.userData.xrController.getWorldPosition(target);
+    } else {
+      // On desktop, position relative to hand anchor
+      target = this.getHandWorldPosition();
+    }
     this.heldMesh.position.lerp(target, delta * 18);
     this.heldMesh.quaternion.slerp(this.camera.quaternion, delta * 10);
     this.heldMesh.userData.velocity.set(0, 0, 0);

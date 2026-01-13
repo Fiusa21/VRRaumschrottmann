@@ -156,12 +156,19 @@ export class LaserTool {
   }
 
   #pullTowardsHand(delta) {
-    const handPos = this.player.getHandWorldPosition(this.tempVec);
+    // In VR, pull towards controller; on desktop, pull towards hand anchor
+    let handPos = this.tempVec;
+    if (this.xrController) {
+      this.xrController.getWorldPosition(handPos);
+    } else {
+      this.player.getHandWorldPosition(handPos);
+    }
+    
     const target = this.currentTarget.position;
     const direction = handPos.clone().sub(target);
     const distance = direction.length();
     if (distance < 0.4) {
-      this.player.attachCargo(this.currentTarget);
+      this.player.attachCargo(this.currentTarget, this.xrController);
       this.currentTarget = null;
       return;
     }

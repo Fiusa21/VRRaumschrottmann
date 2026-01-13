@@ -97,6 +97,14 @@ export class SceneManager {
       });
       this.xrSession = session;
       
+      // Move the world down so player spawns above the platform
+      // This is more reliable than moving the player in VR
+      const yOffset = -2.5;
+      this.platform.mesh.position.y += yOffset;
+      this.collectorPit.group.position.y += yOffset;
+      this.garbageField.moveAll(new THREE.Vector3(0, yOffset, 0));
+      this.teleportController.moveAllPoints(new THREE.Vector3(0, yOffset, 0));
+      
       // Create visible controllers
       const controllerGeometry = new THREE.BoxGeometry(0.05, 0.12, 0.06);
       const controllerMaterial = new THREE.MeshStandardMaterial({
