@@ -7,6 +7,10 @@ export class GarbageCollector {
     this.group.position.copy(position);
     
     this.collectionRadius = 1.2;
+    this.orbitRadius = Math.sqrt(position.x ** 2 + position.z ** 2);
+    this.orbitAngle = Math.atan2(position.z, position.x);
+    this.centerY = position.y;
+    
     this.#build();
   }
 
@@ -39,10 +43,19 @@ export class GarbageCollector {
     this.group.userData.spinSpeed = (Math.random() - 0.5) * 2;
   }
 
-  animate(delta) {
+  animate(delta, difficultyScale = 1) {
     // Gentle bobbing up and down
     const time = performance.now() * 0.001;
-    this.group.position.y = this.position.y + Math.sin(time * 1.5) * 0.3;
+    const bobbing = Math.sin(time * 1.5) * 0.3;
+    
+    // Orbit around center with difficulty scaling speed
+    const orbitSpeed = 0.3 * difficultyScale;
+    this.orbitAngle += delta * orbitSpeed;
+    
+    const newX = Math.cos(this.orbitAngle) * this.orbitRadius;
+    const newZ = Math.sin(this.orbitAngle) * this.orbitRadius;
+    
+    this.group.position.set(newX, this.centerY + bobbing, newZ);
     
     // Slow rotation
     this.group.rotation.x += delta * 0.3;

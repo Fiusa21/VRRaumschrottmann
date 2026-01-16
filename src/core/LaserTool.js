@@ -266,7 +266,7 @@ export class LaserTool {
         dir = this.player.camera.getWorldDirection(this.tempDir);
       }
       // Throw with increased strength
-      this.player.throwCargo(dir, 50);
+      this.player.throwCargo(dir, 80);
       // Mark when it was thrown so it can't be collected immediately
       mesh.userData.thrownTime = performance.now();
     }

@@ -8,7 +8,7 @@ export class Player {
 
     this.controls = new PointerLockControls(camera, canvas);
     this.root = this.controls.getObject();
-    this.root.position.set(0, 8, 10);
+    this.root.position.set(0, 1.5, 10);
 
     this.velocity = new THREE.Vector3();
     this.direction = new THREE.Vector3();
@@ -125,16 +125,16 @@ export class Player {
     const toggle = (state, key) => {
       switch (key.code) {
         case 'KeyW':
-          this.move.forward = state;
-          break;
-        case 'KeyS':
           this.move.backward = state;
           break;
+        case 'KeyS':
+          this.move.forward = state;
+          break;
         case 'KeyA':
-          this.move.left = state;
+          this.move.right = state;
           break;
         case 'KeyD':
-          this.move.right = state;
+          this.move.left = state;
           break;
         case 'ShiftLeft':
           this.move.boost = state;

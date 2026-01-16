@@ -7,7 +7,45 @@ export class GarbageField {
     this.meshes = [];
     this.count = 18;
     this.tempVec = new THREE.Vector3();
-    this.#populate();
+    this.#createTextures();
+  }
+
+  #createTextures() {
+    // Load external PNG textures
+    const textureLoader = new THREE.TextureLoader();
+    this.textures = [];
+    let loadedCount = 0;
+    
+    const textureFiles = [
+      'textures/garbage1.jpg',
+      'textures/garbage2.jpg',
+      'textures/garbage3.jpg',
+    ];
+    
+    for (const file of textureFiles) {
+      textureLoader.load(
+        file,
+        (texture) => {
+          // Successfully loaded
+          this.textures.push(texture);
+          loadedCount++;
+          // Once all textures are loaded, populate the field
+          if (loadedCount === textureFiles.length) {
+            this.#populate();
+          }
+        },
+        undefined,
+        (error) => {
+          // If texture fails to load, skip it
+          console.warn(`Failed to load texture: ${file}`, error);
+          loadedCount++;
+          if (loadedCount === textureFiles.length && this.meshes.length === 0) {
+            // If all failed, populate without textures
+            this.#populate();
+          }
+        }
+      );
+    }
   }
 
   update(delta) {
@@ -40,23 +78,15 @@ export class GarbageField {
       } else {
         // OVER THE PLATFORM: No gravity (unless you want a "thrown" arc)
         if (data.state === 'floating') {
-          // Simple levitation logic
-          const targetY = data.baseHeight + Math.sin(time + data.floatOffset) * data.floatAmp;
-          data.velocity.y += (targetY - mesh.position.y) * delta * 5;
-          data.velocity.multiplyScalar(0.9); // Friction to keep it stable
+          // Just gentle bob up and down, don't pull toward baseHeight
+          data.velocity.y = Math.sin(time + data.floatOffset) * 0.5;
+          data.velocity.multiplyScalar(0.95); // Minimal friction
         } else if (data.state === 'thrown') {
-          // Thrown objects: apply gravity only when approaching the pit, minimal drag to travel
+          // Thrown objects: just apply minimal drag to preserve momentum
           data.velocity.multiplyScalar(0.99); // Very low drag to preserve momentum
           
-          // Check if getting close to pit center - start falling when near pit
-          const distToPitCenter = Math.sqrt(mesh.position.x ** 2 + mesh.position.z ** 2);
-          if (distToPitCenter < 4) {
-            // Close to pit - apply gravity to pull down
-            data.velocity.y -= delta * 20;
-          }
-          
           // Once velocity is low, transition back to floating
-          if (data.velocity.length() < 0.1) {  // Higher threshold - let them travel longer
+          if (data.velocity.length() < 0.1) {  // Threshold to settle
             console.log('Thrown object settling, changing to floating - uuid:', mesh.uuid, 'thrownTime:', data.thrownTime);
             data.state = 'floating';
             data.baseHeight = mesh.position.y;
@@ -151,12 +181,24 @@ export class GarbageField {
       new THREE.CylinderGeometry(0.25, 0.36, 1, 12),
     ];
     const geometry = geometries[Math.floor(Math.random() * geometries.length)];
-    const material = new THREE.MeshStandardMaterial({
-      color: palette[Math.floor(Math.random() * palette.length)],
+    
+    const materialProps = {
+      color: '#ffffff', // White so texture colors show through
       metalness: 0.7,
       roughness: 0.3,
       emissive: '#03111a',
-    });
+    };
+    
+    // Only add texture if textures are loaded
+    if (this.textures && this.textures.length > 0) {
+      const texture = this.textures[Math.floor(Math.random() * this.textures.length)];
+      materialProps.map = texture;
+    } else {
+      // Use palette colors only if no textures
+      materialProps.color = palette[Math.floor(Math.random() * palette.length)];
+    }
+    
+    const material = new THREE.MeshStandardMaterial(materialProps);
 
     const mesh = new THREE.Mesh(geometry, material);
     mesh.castShadow = true;
@@ -177,7 +219,7 @@ export class GarbageField {
     const angle = Math.random() * Math.PI * 2;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
-    const y = 2 + Math.random() * 4;
+    const y = 6 + Math.random() * 6; // Increased from 2-6 to 6-12
     return new THREE.Vector3(x, y, z);
   }
 }

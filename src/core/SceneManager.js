@@ -35,6 +35,12 @@ export class SceneManager {
     this.lastTriggerState = false;
     this.xrController = null;
 
+    // Combo system
+    this.combo = 0;
+    this.comboMultiplier = 1;
+    this.lastCollectionTime = 0;
+    this.comboWindow = 3000; // 3 seconds to maintain combo
+
     this.update = this.update.bind(this);
   }
 
@@ -67,8 +73,16 @@ export class SceneManager {
       this.teleportController.moveAllPoints(movementDelta);
     }
     
-    // Animate garbage collectors
-    this.garbageCollectors.forEach(collector => collector.animate(delta));
+    // Animate garbage collectors with difficulty scaling
+    const difficultyScale = 1 + (this.collected / 25) * 0.5; // Speed increases with collections
+    this.garbageCollectors.forEach(collector => collector.animate(delta, difficultyScale));
+    
+    // Update combo timeout
+    const now = performance.now();
+    if (now - this.lastCollectionTime > this.comboWindow && this.combo > 0) {
+      this.combo = 0;
+      this.comboMultiplier = 1;
+    }
     
     this.laserTool.update(delta);  // Run BEFORE garbageField so objects get grabbed before physics
     this.garbageField.update(delta);
@@ -223,11 +237,22 @@ export class SceneManager {
     // (Prevents double-counting if the pit logic is very fast)
     this.collected += 1;
 
+    // Update combo system
+    const now = performance.now();
+    if (now - this.lastCollectionTime < this.comboWindow) {
+      this.combo += 1;
+      this.comboMultiplier = 1 + (this.combo * 0.1); // +10% per consecutive collection
+    } else {
+      this.combo = 1;
+      this.comboMultiplier = 1;
+    }
+    this.lastCollectionTime = now;
+
     // Use the new remove function instead of respawn
     this.garbageField.removeMesh(mesh);
 
     if (typeof this.hooks.onCollect === 'function') {
-      this.hooks.onCollect(this.collected);
+      this.hooks.onCollect(this.collected, this.combo, this.comboMultiplier);
     }
   }
 
