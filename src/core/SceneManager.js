@@ -5,6 +5,7 @@ import { GarbageField } from './GarbageField.js';
 import { LaserTool } from './LaserTool.js';
 import { GarbageCollector } from './GarbageCollector.js';
 import { TeleportController } from './TeleportController.js';
+import { ScoreDisplay } from './ScoreDisplay.js';
 
 export class SceneManager {
   constructor(canvas, hooks = {}) {
@@ -35,12 +36,8 @@ export class SceneManager {
     this.lastTriggerState = false;
     this.xrController = null;
 
-    // Combo system
-    this.combo = 0;
-    this.comboMultiplier = 1;
-    this.lastCollectionTime = 0;
-    this.comboWindow = 3000; // 3 seconds to maintain combo
-
+    this.scoreDisplay = null;
+    this.starField = null;
     this.update = this.update.bind(this);
   }
 
@@ -73,15 +70,11 @@ export class SceneManager {
       this.teleportController.moveAllPoints(movementDelta);
     }
     
-    // Animate garbage collectors with difficulty scaling
-    const difficultyScale = 1 + (this.collected / 25) * 0.5; // Speed increases with collections
-    this.garbageCollectors.forEach(collector => collector.animate(delta, difficultyScale));
-    
-    // Update combo timeout
-    const now = performance.now();
-    if (now - this.lastCollectionTime > this.comboWindow && this.combo > 0) {
-      this.combo = 0;
-      this.comboMultiplier = 1;
+    // Animate garbage collectors
+    this.garbageCollectors.forEach(collector => collector.animate(delta));
+
+    if (this.scoreDisplay) {
+      this.scoreDisplay.update(this.camera);
     }
     
     this.laserTool.update(delta);  // Run BEFORE garbageField so objects get grabbed before physics
@@ -168,8 +161,13 @@ export class SceneManager {
     dirLight.shadow.camera.right = 25;
     this.scene.add(dirLight);
 
+    this.#addStars();
+
     this.platform = new Platform();
     this.scene.add(this.platform.mesh);
+
+    this.scoreDisplay = new ScoreDisplay();
+    this.scene.add(this.scoreDisplay.mesh);
 
     // Create garbage collectors in space around the platform
     this.garbageCollectors = [];
@@ -215,6 +213,37 @@ export class SceneManager {
     });
   }
 
+  #addStars() {
+    const count = 1200;
+    const radius = 420;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    for (let i = 0; i < count; i += 1) {
+      const r = radius * (0.7 + Math.random() * 0.3);
+      const theta = Math.acos(2 * Math.random() - 1);
+      const phi = Math.random() * Math.PI * 2;
+      const x = r * Math.sin(theta) * Math.cos(phi);
+      const y = r * Math.cos(theta);
+      const z = r * Math.sin(theta) * Math.sin(phi);
+      positions[i * 3] = x;
+      positions[i * 3 + 1] = y;
+      positions[i * 3 + 2] = z;
+    }
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const material = new THREE.PointsMaterial({
+      color: '#cfe9ff',
+      size: 0.9,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+    });
+
+    this.starField = new THREE.Points(geometry, material);
+    this.scene.add(this.starField);
+  }
+
   #checkCollectorCollisions() {
     for (const mesh of this.garbageField.meshes) {
       // Only check thrown and floating objects
@@ -237,22 +266,15 @@ export class SceneManager {
     // (Prevents double-counting if the pit logic is very fast)
     this.collected += 1;
 
-    // Update combo system
-    const now = performance.now();
-    if (now - this.lastCollectionTime < this.comboWindow) {
-      this.combo += 1;
-      this.comboMultiplier = 1 + (this.combo * 0.1); // +10% per consecutive collection
-    } else {
-      this.combo = 1;
-      this.comboMultiplier = 1;
+    if (this.scoreDisplay) {
+      this.scoreDisplay.setScore(this.collected);
     }
-    this.lastCollectionTime = now;
 
     // Use the new remove function instead of respawn
     this.garbageField.removeMesh(mesh);
 
     if (typeof this.hooks.onCollect === 'function') {
-      this.hooks.onCollect(this.collected, this.combo, this.comboMultiplier);
+      this.hooks.onCollect(this.collected);
     }
   }
 
