@@ -159,6 +159,18 @@ export class GarbageField {
     mesh.material.dispose();
   }
 
+  reset() {
+    // Remove existing meshes and dispose resources
+    for (const mesh of this.meshes) {
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    }
+    this.meshes = [];
+    // Repopulate using existing textures if loaded
+    this.#populate();
+  }
+
   moveAll(delta) {
     for (const mesh of this.meshes) {
       mesh.position.add(delta);

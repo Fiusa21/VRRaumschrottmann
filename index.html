@@ -9,6 +9,51 @@
   <body>
     <canvas id="game-canvas"></canvas>
 
+    <div id="menu-overlay" class="overlay">
+      <div class="overlay-card">
+        <div class="overlay-header">
+          <div>
+            <p class="eyebrow">VR Raumschrottmann</p>
+            <h1>Mission Briefing</h1>
+            <p class="lede">Collect orbital debris, feed the core, and survive the rotating collectors.</p>
+          </div>
+          <div class="actions">
+            <button id="start-desktop" class="primary">Play Desktop</button>
+            <button id="start-vr" class="accent">Play in VR</button>
+            <button id="resume-game" class="ghost">Back to Game</button>
+          </div>
+        </div>
+
+        <div class="manual">
+          <div>
+            <h2>Controls</h2>
+            <ul>
+              <li>Desktop: Click to lock cursor; WASD move, Shift boost.</li>
+              <li>Mouse: Hold left to pull debris, release to throw.</li>
+              <li>Teleport: Press T or the Teleport button.</li>
+              <li>VR: Right controller trigger to pull, grip to throw; left stick to move.</li>
+            </ul>
+          </div>
+          <div>
+            <h2>Objective</h2>
+            <ul>
+              <li>Grab floating debris with your laser.</li>
+              <li>Toss debris into the glowing core to score.</li>
+              <li>Avoid the roaming collectors or you lose your shot.</li>
+            </ul>
+          </div>
+          <div>
+            <h2>Tips</h2>
+            <ul>
+              <li>Throw with some arc toward the core center.</li>
+              <li>Stay mobile; the collectors orbit unpredictably.</li>
+              <li>Use teleport to reposition quickly.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <section class="hud">
       <div class="panel">
         <h1>Neo Junk Ops</h1>
@@ -21,10 +66,12 @@
         </ul>
         <button id="teleport-btn">Teleport</button>
         <button id="vr-btn">Enter VR</button>
+        <button id="manual-btn">Manual</button>
+        <button id="restart-btn">Restart</button>
       </div>
       <div class="status">
-        <span>Collected:</span>
-        <span id="collected-count">0</span>
+        <div class="status-row"><span>Time:</span><span id="timer-display">02:00</span></div>
+        <div class="status-row"><span>Collected:</span><span id="collected-count">0</span></div>
       </div>
     </section>
 

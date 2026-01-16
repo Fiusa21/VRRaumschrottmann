@@ -6,6 +6,9 @@ import { LaserTool } from './LaserTool.js';
 import { GarbageCollector } from './GarbageCollector.js';
 import { TeleportController } from './TeleportController.js';
 import { ScoreDisplay } from './ScoreDisplay.js';
+import { VRManualBoard } from './VRManualBoard.js';
+import { TimerDisplay } from './TimerDisplay.js';
+import { GameOverBoard } from './GameOverBoard.js';
 
 export class SceneManager {
   constructor(canvas, hooks = {}) {
@@ -31,13 +34,23 @@ export class SceneManager {
 
     this.clock = new THREE.Clock();
     this.collected = 0;
+    this.roundDuration = 60; // seconds
+    this.remainingTime = this.roundDuration;
+    this.roundEnded = false;
     this.xrSession = null;
     this.xrInputSources = [];
     this.lastTriggerState = false;
+    this.lastManualButtonState = false;
+    this.lastRestartButtonState = false;
+    this.lastRestartButton4State = false;
+    this.gripHoldStart = null;
     this.xrController = null;
 
     this.scoreDisplay = null;
+    this.timerDisplay = null;
     this.starField = null;
+    this.manualBoard = null;
+    this.gameOverBoard = null;
     this.update = this.update.bind(this);
   }
 
@@ -48,11 +61,30 @@ export class SceneManager {
   }
 
   start() {
+    this.remainingTime = this.roundDuration;
+    this.roundEnded = false;
+    if (this.timerDisplay) {
+      this.timerDisplay.setTime(this.remainingTime);
+    }
+    if (this.scoreDisplay) {
+      this.scoreDisplay.setScore(this.collected);
+    }
     this.renderer.setAnimationLoop(this.update);
   }
 
   update() {
     const delta = Math.min(this.clock.getDelta(), 0.05);
+
+    if (!this.roundEnded) {
+      this.remainingTime = Math.max(0, this.remainingTime - delta);
+      if (typeof this.hooks.onTimerUpdate === 'function') {
+        this.hooks.onTimerUpdate(this.remainingTime);
+      }
+      if (this.remainingTime <= 0) {
+        this.#endRound();
+        return;
+      }
+    }
 
     // Process XR controller input if in VR
     if (this.xrSession && this.xrInputSources.length > 0) {
@@ -75,6 +107,19 @@ export class SceneManager {
 
     if (this.scoreDisplay) {
       this.scoreDisplay.update(this.camera);
+    }
+
+    if (this.timerDisplay) {
+      this.timerDisplay.update(this.camera);
+      this.timerDisplay.setTime(this.remainingTime);
+    }
+
+    if (this.manualBoard) {
+      this.manualBoard.update(this.camera);
+    }
+
+    if (this.gameOverBoard) {
+      this.gameOverBoard.update(this.camera);
     }
     
     this.laserTool.update(delta);  // Run BEFORE garbageField so objects get grabbed before physics
@@ -142,6 +187,10 @@ export class SceneManager {
       });
       
       this.renderer.xr.setSession(session);
+
+      if (this.manualBoard) {
+        this.manualBoard.setVisible(true);
+      }
     } catch (error) {
       console.error('Failed to start XR session:', error);
       alert('Could not start VR mode');
@@ -168,6 +217,15 @@ export class SceneManager {
 
     this.scoreDisplay = new ScoreDisplay();
     this.scene.add(this.scoreDisplay.mesh);
+
+    this.timerDisplay = new TimerDisplay();
+    this.scene.add(this.timerDisplay.mesh);
+
+    this.manualBoard = new VRManualBoard();
+    this.scene.add(this.manualBoard.mesh);
+
+    this.gameOverBoard = new GameOverBoard();
+    this.scene.add(this.gameOverBoard.mesh);
 
     // Create garbage collectors in space around the platform
     this.garbageCollectors = [];
@@ -261,6 +319,24 @@ export class SceneManager {
     }
   }
 
+  showManualBoard() {
+    if (this.manualBoard) {
+      this.manualBoard.setVisible(true);
+    }
+  }
+
+  hideManualBoard() {
+    if (this.manualBoard) {
+      this.manualBoard.setVisible(false);
+    }
+  }
+
+  toggleManualBoard() {
+    if (this.manualBoard) {
+      this.manualBoard.toggle();
+    }
+  }
+
   #handleCollection(mesh) {
     // Only increment if the mesh is actually still in the game
     // (Prevents double-counting if the pit logic is very fast)
@@ -276,6 +352,40 @@ export class SceneManager {
     if (typeof this.hooks.onCollect === 'function') {
       this.hooks.onCollect(this.collected);
     }
+  }
+
+  #endRound() {
+    if (this.roundEnded) return;
+    this.roundEnded = true;
+    if (this.gameOverBoard) {
+      this.gameOverBoard.setScore(this.collected);
+      this.gameOverBoard.setVisible(true);
+    }
+    if (typeof this.hooks.onRoundEnd === 'function') {
+      this.hooks.onRoundEnd();
+    }
+  }
+
+  restartRound() {
+    this.roundEnded = false;
+    this.remainingTime = this.roundDuration;
+    this.collected = 0;
+    if (this.gameOverBoard) {
+      this.gameOverBoard.setVisible(false);
+    }
+    if (this.garbageField) {
+      this.garbageField.reset();
+    }
+    if (this.scoreDisplay) {
+      this.scoreDisplay.setScore(0);
+    }
+    if (this.timerDisplay) {
+      this.timerDisplay.setTime(this.remainingTime);
+    }
+    if (typeof this.hooks.onCollect === 'function') {
+      this.hooks.onCollect(this.collected);
+    }
+    this.renderer.setAnimationLoop(this.update);
   }
 
   #processXRInput() {
@@ -320,6 +430,40 @@ export class SceneManager {
           this.laserTool.throwHeldObject();
         }
         this.lastGripState = gripPressed;
+
+        // Grip long-press fallback to restart (1.2s)
+        if (gripPressed) {
+          if (this.gripHoldStart == null) {
+            this.gripHoldStart = performance.now();
+          } else if (performance.now() - this.gripHoldStart > 1200) {
+            console.log('[XR] Grip long-press: restart round');
+            this.restartRound();
+            this.gripHoldStart = null;
+          }
+        } else {
+          this.gripHoldStart = null;
+        }
+
+        // Use A/X (button 3) to toggle the VR manual board
+        const manualPressed = gamepad.buttons[3]?.pressed || false;
+        if (manualPressed && !this.lastManualButtonState) {
+          this.toggleManualBoard();
+        }
+        this.lastManualButtonState = manualPressed;
+
+        // Use B/Y to restart: some devices use index 2, others 4
+        const restartPressed2 = gamepad.buttons[2]?.pressed || false;
+        const restartPressed4 = gamepad.buttons[4]?.pressed || false;
+        if (restartPressed2 && !this.lastRestartButtonState) {
+          console.log('[XR] Button 2: restart round');
+          this.restartRound();
+        }
+        if (restartPressed4 && !this.lastRestartButton4State) {
+          console.log('[XR] Button 4: restart round');
+          this.restartRound();
+        }
+        this.lastRestartButtonState = restartPressed2;
+        this.lastRestartButton4State = restartPressed4;
       }
     }
   }
