@@ -1,7 +1,6 @@
 import { SceneManager } from './core/SceneManager.js';
 
 const canvas = document.getElementById('game-canvas');
-const teleportBtn = document.getElementById('teleport-btn');
 const vrBtn = document.getElementById('vr-btn');
 const collectedLabel = document.getElementById('collected-count');
 const timerLabel = document.getElementById('timer-display');
@@ -54,7 +53,6 @@ async function boot(mode = 'desktop') {
   overlay?.classList.add('hidden');
 }
 
-teleportBtn.addEventListener('click', () => sceneManager.teleportPlayer());
 vrBtn.addEventListener('click', () => boot('vr'));
 startDesktopBtn?.addEventListener('click', () => boot('desktop'));
 startVrBtn?.addEventListener('click', () => boot('vr'));

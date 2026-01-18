@@ -65,7 +65,6 @@ export class GarbageField {
 
       // 1. STATE & GRAVITY LOGIC
       if (distFromCenter < this.innerRadius) {
-        // OVER THE PIT: Apply Gravity and Vortex (but not if recently thrown)
         if (data.state !== 'thrown') {
           data.state = 'falling';
           if (data.state !== 'falling') {
@@ -76,47 +75,46 @@ export class GarbageField {
         this.tempVec.set(-mesh.position.x, 0, -mesh.position.z).normalize();
         data.velocity.addScaledVector(this.tempVec, 15 * delta); // Vortex
       } else {
-        // OVER THE PLATFORM: No gravity (unless you want a "thrown" arc)
+        // OVER THE PLATFORM: No gravity
         if (data.state === 'floating') {
-          // Just gentle bob up and down, don't pull toward baseHeight
+
           data.velocity.y = Math.sin(time + data.floatOffset) * 0.5;
-          data.velocity.multiplyScalar(0.95); // Minimal friction
+          data.velocity.multiplyScalar(0.95);
         } else if (data.state === 'thrown') {
-          // Thrown objects: just apply minimal drag to preserve momentum
-          data.velocity.multiplyScalar(0.99); // Very low drag to preserve momentum
+
+          data.velocity.multiplyScalar(0.99);
           
-          // Once velocity is low, transition back to floating
-          if (data.velocity.length() < 0.1) {  // Threshold to settle
+
+          if (data.velocity.length() < 0.1) {
             console.log('Thrown object settling, changing to floating - uuid:', mesh.uuid, 'thrownTime:', data.thrownTime);
             data.state = 'floating';
             data.baseHeight = mesh.position.y;
           }
         } else if (data.state === 'falling') {
-          // If it was "thrown" but isn't over the pit yet,
-          // let it travel in a straight line or return to floating
+
+
           if (data.velocity.length() < 0.5) {
-            data.state = 'floating'; // Return to float if it slows down
+            data.state = 'floating';
           }
         }
       }
 
-      // 2. APPLY MOVEMENT
+
       mesh.position.addScaledVector(data.velocity, delta);
 
-      // 3. BOUNCE LOGIC (Impact angle = Outbound angle)
-      // Only check if over the solid part of the platform
+
       if (distFromCenter > this.innerRadius && distFromCenter < platformRadius) {
         if (mesh.position.y < platformTop) {
-          mesh.position.y = platformTop; // Prevent sinking
+          mesh.position.y = platformTop;
 
-          // REFLECT: This handles the outbound angle perfectly
-          // We reflect the velocity vector against the upward floor normal
+
+
           data.velocity.reflect(floorNormal);
 
-          // Damping: Reduce energy so it doesn't bounce forever (0.7 = 70% retention)
+
           data.velocity.multiplyScalar(0.7);
 
-          // Give it a little spin variation on impact for realism
+
           data.spin.x += (Math.random() - 0.5) * 2;
         }
       }
@@ -148,10 +146,10 @@ export class GarbageField {
 
   // Add this method to your GarbageField class
   removeMesh(mesh) {
-    // 1. Remove from the Three.js scene
+
     this.scene.remove(mesh);
 
-    // 2. Remove from the internal array so checkCapture stops seeing it
+
     this.meshes = this.meshes.filter(m => m !== mesh);
 
     // 3. Proper memory cleanup
@@ -160,14 +158,14 @@ export class GarbageField {
   }
 
   reset() {
-    // Remove existing meshes and dispose resources
+
     for (const mesh of this.meshes) {
       this.scene.remove(mesh);
       mesh.geometry.dispose();
       mesh.material.dispose();
     }
     this.meshes = [];
-    // Repopulate using existing textures if loaded
+
     this.#populate();
   }
 
@@ -201,12 +199,12 @@ export class GarbageField {
       emissive: '#03111a',
     };
     
-    // Only add texture if textures are loaded
+
     if (this.textures && this.textures.length > 0) {
       const texture = this.textures[Math.floor(Math.random() * this.textures.length)];
       materialProps.map = texture;
     } else {
-      // Use palette colors only if no textures
+
       materialProps.color = palette[Math.floor(Math.random() * palette.length)];
     }
     

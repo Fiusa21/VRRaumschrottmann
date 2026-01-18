@@ -19,17 +19,22 @@ export class LaserTool {
 
   setXRController(controller) {
     this.xrController = controller;
-    // Attach beam to controller when in VR
+    // Attach beam and pistol model to controller when in VR
     if (this.beam && this.beam.parent) {
       this.beam.parent.remove(this.beam);
+    }
+    if (this.pistolModel && this.pistolModel.parent) {
+      this.pistolModel.parent.remove(this.pistolModel);
     }
     if (controller) {
       this.beamContainer = controller;
       this.beamContainer.add(this.beam);
+      this.beamContainer.add(this.pistolModel);
       this.beam.position.set(0, 0, 0);
     } else {
       this.beamContainer = this.player.handAnchor;
       this.beamContainer.add(this.beam);
+      this.beamContainer.add(this.pistolModel);
     }
   }
 
@@ -126,10 +131,89 @@ export class LaserTool {
     this.beam = new THREE.Mesh(geometry, material);
     this.beam.visible = true;
     this.beam.scale.set(1, 0, 1);
+    
+    // Create pistol-shaped tool model
+    this.#createPistolModel();
+    
     // Initially attach to hand anchor (will be moved to controller on VR start)
     this.beamContainer = this.player.handAnchor;
     this.beamContainer.add(this.beam);
+    this.beamContainer.add(this.pistolModel);
     this.beam.position.set(0, 0, 0);
+  }
+
+  #createPistolModel() {
+    // Create a group to hold all pistol parts
+    this.pistolModel = new THREE.Group();
+    
+    // Material for the pistol
+    const pistolMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2a2a2a,
+      metalness: 0.7,
+      roughness: 0.3,
+    });
+    
+    const accentMaterial = new THREE.MeshStandardMaterial({
+      color: 0x6efbff,
+      metalness: 0.8,
+      roughness: 0.2,
+      emissive: 0x6efbff,
+      emissiveIntensity: 0.3,
+    });
+    
+    // Handle (grip)
+    const handleGeometry = new THREE.BoxGeometry(0.03, 0.1, 0.04);
+    const handle = new THREE.Mesh(handleGeometry, pistolMaterial);
+    handle.position.set(0, -0.05, 0.01);
+    handle.rotation.x = -0.2;
+    this.pistolModel.add(handle);
+    
+    // Main body (barrel housing)
+    const bodyGeometry = new THREE.BoxGeometry(0.035, 0.04, 0.12);
+    const body = new THREE.Mesh(bodyGeometry, pistolMaterial);
+    body.position.set(0, 0.02, -0.04);
+    this.pistolModel.add(body);
+    
+    // Barrel
+    const barrelGeometry = new THREE.CylinderGeometry(0.008, 0.008, 0.08, 8);
+    const barrel = new THREE.Mesh(barrelGeometry, pistolMaterial);
+    barrel.position.set(0, 0.02, -0.08);
+    barrel.rotation.x = Math.PI / 2;
+    this.pistolModel.add(barrel);
+    
+    // Barrel tip (glowing accent)
+    const barrelTipGeometry = new THREE.CylinderGeometry(0.012, 0.012, 0.02, 8);
+    const barrelTip = new THREE.Mesh(barrelTipGeometry, accentMaterial);
+    barrelTip.position.set(0, 0.02, -0.12);
+    barrelTip.rotation.x = Math.PI / 2;
+    this.pistolModel.add(barrelTip);
+    
+    // Trigger guard
+    const triggerGuardGeometry = new THREE.TorusGeometry(0.02, 0.003, 8, 12, Math.PI);
+    const triggerGuard = new THREE.Mesh(triggerGuardGeometry, pistolMaterial);
+    triggerGuard.position.set(0, -0.01, 0.01);
+    triggerGuard.rotation.x = Math.PI / 2;
+    this.pistolModel.add(triggerGuard);
+    
+    // Trigger
+    const triggerGeometry = new THREE.BoxGeometry(0.008, 0.02, 0.015);
+    const trigger = new THREE.Mesh(triggerGeometry, accentMaterial);
+    trigger.position.set(0, -0.015, 0.01);
+    this.pistolModel.add(trigger);
+    
+    // Side details (tech panels)
+    const panelGeometry = new THREE.BoxGeometry(0.036, 0.015, 0.04);
+    const panelLeft = new THREE.Mesh(panelGeometry, accentMaterial);
+    panelLeft.position.set(0.018, 0.01, -0.03);
+    this.pistolModel.add(panelLeft);
+    
+    const panelRight = new THREE.Mesh(panelGeometry, accentMaterial);
+    panelRight.position.set(-0.018, 0.01, -0.03);
+    this.pistolModel.add(panelRight);
+    
+    // Position the entire pistol model
+    this.pistolModel.position.set(0, 0, 0);
+    this.pistolModel.rotation.x = 0; // No rotation - barrel points along -Z axis
   }
 
   #bind() {

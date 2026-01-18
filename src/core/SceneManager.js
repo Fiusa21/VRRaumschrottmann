@@ -4,7 +4,6 @@ import { Platform } from './Platform.js';
 import { GarbageField } from './GarbageField.js';
 import { LaserTool } from './LaserTool.js';
 import { GarbageCollector } from './GarbageCollector.js';
-import { TeleportController } from './TeleportController.js';
 import { ScoreDisplay } from './ScoreDisplay.js';
 import { VRManualBoard } from './VRManualBoard.js';
 import { TimerDisplay } from './TimerDisplay.js';
@@ -99,7 +98,6 @@ export class SceneManager {
       this.platform.mesh.position.add(movementDelta);
       this.garbageCollectors.forEach(collector => collector.group.position.add(movementDelta));
       this.garbageField.moveAll(movementDelta);
-      this.teleportController.moveAllPoints(movementDelta);
     }
     
     // Animate garbage collectors
@@ -258,9 +256,7 @@ export class SceneManager {
       onGrab: (mesh) => this.scene.attach(mesh),
     });
 
-    this.teleportController = new TeleportController({
-      radius: this.platform.radius * 0.7,
-    });
+
   }
 
   #setupEvents() {
